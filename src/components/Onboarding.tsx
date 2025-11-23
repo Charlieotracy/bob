@@ -91,10 +91,18 @@ export const Onboarding: React.FC<OnboardingProps> = ({ onComplete }) => {
       const forecastData: MonthlyMetric[] = [];
       for (let i = 1; i <= 6; i++) {
          const projected = lastMonthRev + (safeTrend * i);
-         forecastData.push({
-             month: `Next +${i}`,
+         const projected2 = lastMonthRev + (safeTrend * i * .5);
+         if (i % 2 === 0) {
+            forecastData.push({
+            month: `Next +${i}`,
              value: Math.round(projected)
          });
+         } else {
+            forecastData.push({
+            month: `Next +${i}`,
+             value: Math.round(projected2)
+            });
+        }
       }
 
       const financialData: FinancialData = {

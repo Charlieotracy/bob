@@ -5,8 +5,8 @@ import {
   AreaChart, Area
 } from 'recharts';
 import { 
-  LayoutDashboard, Wallet, Receipt, TrendingUp, Settings, 
-  LogOut, Bell, Search, Menu, DollarSign, Activity, AlertCircle,
+  LayoutDashboard, Wallet, Receipt, TrendingUp, 
+  LogOut, Menu, DollarSign, AlertCircle,
   Sliders, RefreshCcw, ArrowRight
 } from 'lucide-react';
 import { ChatWidget } from './ChatWidget';
@@ -44,6 +44,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ data }) => {
     return {
         annualRevenue: annRev,
         monthlyExpenses: monExp,
+        netIncome: net,
         cashFlow: cash,
         healthScore: score
     };
@@ -314,7 +315,10 @@ export const Dashboard: React.FC<DashboardProps> = ({ data }) => {
         </div>
       </main>
       
-      <ChatWidget />
+      <ChatWidget 
+        financialContext={sim} 
+        isSimulating={isSimulating} 
+      />
     </div>
   );
 };
