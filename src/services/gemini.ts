@@ -1,7 +1,8 @@
 import { GoogleGenAI, Chat } from "@google/genai";
 import { FinancialData } from "../types";
 
-const API_KEY = process.env.API_KEY || '';
+// Use Vite env var (must be prefixed with VITE_ in your .env)
+const API_KEY = import.meta.env.VITE_API_KEY || '';
 
 let ai: GoogleGenAI | null = null;
 let chatSession: Chat | null = null;
@@ -53,7 +54,7 @@ export const resetChat = () => {
 };
 
 export const sendMessageToBob = async (
-  text: string, 
+  text: string,
   context?: {
     annualRevenue: number;
     monthlyExpenses: number;

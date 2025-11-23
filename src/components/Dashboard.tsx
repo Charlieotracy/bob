@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { FinancialData } from '../types';
 import { 
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, 
@@ -10,6 +10,7 @@ import {
   Sliders, RefreshCcw, ArrowRight
 } from 'lucide-react';
 import { ChatWidget } from './ChatWidget';
+import { initializeGemini } from '../services/gemini';
 
 interface DashboardProps {
   data: FinancialData;
@@ -30,6 +31,15 @@ export const Dashboard: React.FC<DashboardProps> = ({ data }) => {
   };
 
   const isSimulating = revenueAdj !== 0 || expenseAdj !== 0;
+
+  // Ensure Gemini is initialized when the Dashboard mounts with data
+  useEffect(() => {
+    try {
+      initializeGemini(data);
+    } catch (err) {
+      console.error('Failed to initialize Gemini from Dashboard:', err);
+    }
+  }, [data]);
 
   // Calculate simulated metrics
   const sim = useMemo(() => {
