@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useMemo } from 'react';
 import { FinancialData } from '../types';
 import { 
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, 
@@ -6,7 +6,8 @@ import {
 } from 'recharts';
 import { 
   LayoutDashboard, Wallet, Receipt, TrendingUp, Settings, 
-  LogOut, Bell, Search, Menu, DollarSign, Activity, AlertCircle
+  LogOut, Bell, Search, Menu, DollarSign, Activity, AlertCircle,
+  Sliders, RefreshCcw, ArrowRight
 } from 'lucide-react';
 import { ChatWidget } from './ChatWidget';
 
@@ -15,10 +16,38 @@ interface DashboardProps {
 }
 
 export const Dashboard: React.FC<DashboardProps> = ({ data }) => {
-  // Disabled handlers
+  // State for simulation
+  const [revenueAdj, setRevenueAdj] = useState(0);
+  const [expenseAdj, setExpenseAdj] = useState(0);
+
   const handleAction = (action: string) => {
     console.log(`Action disabled: ${action}`);
   };
+
+  const resetSimulation = () => {
+    setRevenueAdj(0);
+    setExpenseAdj(0);
+  };
+
+  const isSimulating = revenueAdj !== 0 || expenseAdj !== 0;
+
+  // Calculate simulated metrics
+  const sim = useMemo(() => {
+    const annRev = data.annualRevenue * (1 + revenueAdj / 100);
+    const monExp = data.monthlyExpenses * (1 + expenseAdj / 100);
+    const annExp = monExp * 12;
+    const net = annRev - annExp;
+    const cash = net / 12;
+    let score = annRev > 0 ? (net / annRev) * 100 : 0;
+    score = Math.min(100, Math.max(0, Math.round(score)));
+    
+    return {
+        annualRevenue: annRev,
+        monthlyExpenses: monExp,
+        cashFlow: cash,
+        healthScore: score
+    };
+  }, [data, revenueAdj, expenseAdj]);
 
   return (
     <div className="min-h-screen bg-slate-50 flex font-sans text-slate-900">
@@ -33,10 +62,6 @@ export const Dashboard: React.FC<DashboardProps> = ({ data }) => {
 
         <nav className="flex-1 px-4 space-y-2 mt-6">
           <NavItem active icon={LayoutDashboard} label="Dashboard" onClick={() => handleAction('Dashboard')} />
-          <NavItem icon={Wallet} label="Revenue" onClick={() => handleAction('Revenue')} />
-          <NavItem icon={Receipt} label="Expenses" onClick={() => handleAction('Expenses')} />
-          <NavItem icon={Activity} label="Forecast" onClick={() => handleAction('Forecast')} />
-          <NavItem icon={Settings} label="Settings" onClick={() => handleAction('Settings')} />
         </nav>
 
         <div className="p-4 border-t border-gray-800 mt-auto">
@@ -63,19 +88,6 @@ export const Dashboard: React.FC<DashboardProps> = ({ data }) => {
           </div>
 
           <div className="flex items-center gap-4">
-             <div className="hidden md:flex items-center bg-slate-100 rounded-lg px-3 py-2">
-               <Search size={18} className="text-slate-400" />
-               <input 
-                 type="text" 
-                 placeholder="Search..." 
-                 className="bg-transparent border-none outline-none text-sm ml-2 w-48"
-                 onChange={() => handleAction('Search')}
-               />
-             </div>
-             <button onClick={() => handleAction('Notifications')} className="p-2 text-slate-500 hover:bg-slate-100 rounded-full relative">
-               <Bell size={20} />
-               <span className="absolute top-2 right-2 w-2 h-2 bg-red-500 rounded-full"></span>
-             </button>
              <div className="w-10 h-10 bg-[#299D91] rounded-full flex items-center justify-center text-white font-bold shadow-lg shadow-teal-900/20">
                {data.companyName.substring(0, 2).toUpperCase()}
              </div>
@@ -86,36 +98,47 @@ export const Dashboard: React.FC<DashboardProps> = ({ data }) => {
         <div className="p-8 space-y-8">
           
           {/* WELCOME */}
-          <div>
-            <h3 className="text-xl font-medium text-slate-600">Welcome back, <span className="text-slate-900 font-bold">{data.companyName}</span></h3>
-            <p className="text-slate-500 text-sm mt-1">Here's what's happening with your business today.</p>
+          <div className="flex justify-between items-end">
+            <div>
+                <h3 className="text-xl font-medium text-slate-600">Welcome back, <span className="text-slate-900 font-bold">{data.companyName}</span></h3>
+                <p className="text-slate-500 text-sm mt-1">Here's what's happening with your business today.</p>
+            </div>
+            {isSimulating && (
+                <div className="flex items-center gap-2 bg-teal-50 text-teal-700 px-4 py-2 rounded-full text-sm font-bold border border-teal-100 animate-pulse">
+                    <Sliders size={16} />
+                    Simulation Active
+                </div>
+            )}
           </div>
 
           {/* KPI GRID */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
             <StatCard 
               label="Annual Revenue" 
-              value={`$${data.annualRevenue.toLocaleString()}`} 
+              value={`$${Math.round(sim.annualRevenue).toLocaleString()}`} 
               icon={DollarSign} 
-              color="text-[#299D91]" 
-              bg="bg-teal-50"
+              color={isSimulating ? "text-teal-600" : "text-[#299D91]"}
+              bg={isSimulating ? "bg-teal-100" : "bg-teal-50"}
+              isSimulated={isSimulating && revenueAdj !== 0}
             />
             <StatCard 
               label="Monthly Expenses" 
-              value={`$${data.monthlyExpenses.toLocaleString()}`} 
+              value={`$${Math.round(sim.monthlyExpenses).toLocaleString()}`} 
               icon={Receipt} 
-              color="text-red-600" 
-              bg="bg-red-50"
+              color={isSimulating ? "text-purple-600" : "text-red-600"}
+              bg={isSimulating ? "bg-purple-100" : "bg-red-50"}
+              isSimulated={isSimulating && expenseAdj !== 0}
             />
             <StatCard 
               label="Cash Flow" 
-              value={`$${data.cashFlow.toLocaleString()}`} 
+              value={`$${Math.round(sim.cashFlow).toLocaleString()}`} 
               subValue="Monthly Net"
               icon={Wallet} 
-              color={data.cashFlow >= 0 ? "text-[#299D91]" : "text-orange-600"} 
-              bg={data.cashFlow >= 0 ? "bg-teal-50" : "bg-orange-50"}
+              color={sim.cashFlow >= 0 ? "text-[#299D91]" : "text-orange-600"} 
+              bg={sim.cashFlow >= 0 ? "bg-teal-50" : "bg-orange-50"}
+              isSimulated={isSimulating}
             />
-            <HealthScoreGauge score={data.healthScore} />
+            <HealthScoreGauge score={sim.healthScore} isSimulated={isSimulating} />
           </div>
 
           {/* CHARTS ROW */}
@@ -172,43 +195,119 @@ export const Dashboard: React.FC<DashboardProps> = ({ data }) => {
 
           </div>
 
-          {/* TRANSACTIONS */}
-          <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-            <div className="p-6 border-b border-slate-200 flex justify-between items-center">
-              <h3 className="font-bold text-slate-800">Recent Transactions</h3>
-              <button onClick={() => handleAction('View All Transactions')} className="text-sm text-[#299D91] font-medium hover:text-[#228479]">View All</button>
-            </div>
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-sm text-slate-600">
-                <thead className="bg-slate-50 text-slate-500 font-medium">
-                  <tr>
-                    <th className="px-6 py-4">Date</th>
-                    <th className="px-6 py-4">Description</th>
-                    <th className="px-6 py-4">Type</th>
-                    <th className="px-6 py-4 text-right">Amount</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-200">
-                  {data.recentTransactions.map((t) => (
-                    <tr key={t.id} className="hover:bg-slate-50 transition-colors">
-                      <td className="px-6 py-4">{t.date}</td>
-                      <td className="px-6 py-4 font-medium text-slate-800">{t.description}</td>
-                      <td className="px-6 py-4">
-                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                          t.type === 'income' ? 'bg-teal-100 text-teal-800' : 'bg-red-100 text-red-800'
-                        }`}>
-                          {t.type.charAt(0).toUpperCase() + t.type.slice(1)}
-                        </span>
-                      </td>
-                      <td className={`px-6 py-4 text-right font-bold ${
-                        t.type === 'income' ? 'text-[#299D91]' : 'text-slate-900'
-                      }`}>
-                        {t.type === 'income' ? '+' : '-'}${t.amount.toLocaleString()}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+          {/* SIMULATION WIDGET (Replacing Transactions) */}
+          <div className="bg-white rounded-xl shadow-lg border border-teal-100 overflow-hidden relative">
+            <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-teal-400 to-purple-500"></div>
+            <div className="p-8">
+                <div className="flex justify-between items-center mb-8">
+                    <div>
+                        <h3 className="text-xl font-bold text-slate-800 flex items-center gap-2">
+                            <Sliders className="text-teal-600" /> 
+                            "What-If" Scenario Planner
+                        </h3>
+                        <p className="text-slate-500 mt-1">Adjust the levers below to simulate future outcomes for <span className="font-semibold">{data.companyName}</span>.</p>
+                    </div>
+                    {isSimulating && (
+                        <button 
+                            onClick={resetSimulation}
+                            className="flex items-center gap-2 text-sm font-bold text-slate-500 hover:text-slate-800 px-4 py-2 bg-slate-100 rounded-lg transition-colors"
+                        >
+                            <RefreshCcw size={14} /> Reset Default
+                        </button>
+                    )}
+                </div>
+
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-12">
+                    {/* Sliders */}
+                    <div className="space-y-8">
+                        {/* Revenue Slider */}
+                        <div className="bg-slate-50 p-6 rounded-xl border border-slate-100">
+                            <div className="flex justify-between items-center mb-4">
+                                <label className="font-bold text-slate-700">Revenue Growth</label>
+                                <span className={`px-3 py-1 rounded-full text-sm font-bold ${revenueAdj > 0 ? 'bg-teal-100 text-teal-700' : revenueAdj < 0 ? 'bg-orange-100 text-orange-700' : 'bg-slate-200 text-slate-600'}`}>
+                                    {revenueAdj > 0 ? '+' : ''}{revenueAdj}%
+                                </span>
+                            </div>
+                            <input 
+                                type="range" 
+                                min="-50" 
+                                max="50" 
+                                step="5"
+                                value={revenueAdj}
+                                onChange={(e) => setRevenueAdj(parseInt(e.target.value))}
+                                className="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-teal-600"
+                            />
+                            <div className="flex justify-between text-xs text-slate-400 mt-2 font-medium">
+                                <span>-50%</span>
+                                <span>Current</span>
+                                <span>+50%</span>
+                            </div>
+                        </div>
+
+                        {/* Expenses Slider */}
+                        <div className="bg-slate-50 p-6 rounded-xl border border-slate-100">
+                            <div className="flex justify-between items-center mb-4">
+                                <label className="font-bold text-slate-700">Operational Costs</label>
+                                <span className={`px-3 py-1 rounded-full text-sm font-bold ${expenseAdj > 0 ? 'bg-orange-100 text-orange-700' : expenseAdj < 0 ? 'bg-teal-100 text-teal-700' : 'bg-slate-200 text-slate-600'}`}>
+                                    {expenseAdj > 0 ? '+' : ''}{expenseAdj}%
+                                </span>
+                            </div>
+                            <input 
+                                type="range" 
+                                min="-50" 
+                                max="50" 
+                                step="5"
+                                value={expenseAdj}
+                                onChange={(e) => setExpenseAdj(parseInt(e.target.value))}
+                                className="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-purple-500" 
+                            />
+                            <div className="flex justify-between text-xs text-slate-400 mt-2 font-medium">
+                                <span>-50%</span>
+                                <span>Current</span>
+                                <span>+50%</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Impact Summary */}
+                    <div className="flex flex-col justify-center space-y-6">
+                         <h4 className="font-bold text-slate-800 border-b border-slate-100 pb-2">Projected Impact</h4>
+                         
+                         <div className="space-y-4">
+                            <ImpactRow 
+                                label="Health Score" 
+                                current={data.healthScore} 
+                                projected={sim.healthScore} 
+                                inverse={false}
+                                suffix="/100"
+                            />
+                             <ImpactRow 
+                                label="Monthly Cash Flow" 
+                                current={data.cashFlow} 
+                                projected={sim.cashFlow} 
+                                inverse={false}
+                                isCurrency
+                            />
+                             <ImpactRow 
+                                label="Annual Profit" 
+                                current={data.annualRevenue - (data.monthlyExpenses * 12)} 
+                                projected={sim.annualRevenue - (sim.monthlyExpenses * 12)} 
+                                inverse={false}
+                                isCurrency
+                            />
+                         </div>
+
+                         <div className="mt-6 bg-blue-50 p-4 rounded-lg flex gap-3 items-start">
+                            <AlertCircle className="text-blue-500 mt-1 shrink-0" size={18} />
+                            <p className="text-sm text-blue-800 leading-relaxed">
+                                {revenueAdj === 0 && expenseAdj === 0 
+                                    ? "Adjust the sliders to see how changes in revenue and expenses impact your business health."
+                                    : "This simulation is based on simplified linear projections. Consult 'Bob' for detailed strategies on how to achieve these numbers."
+                                }
+                            </p>
+                         </div>
+                    </div>
+                </div>
             </div>
           </div>
 
@@ -219,6 +318,34 @@ export const Dashboard: React.FC<DashboardProps> = ({ data }) => {
     </div>
   );
 };
+
+// Helper component for Impact Row
+const ImpactRow = ({ label, current, projected, inverse, suffix = '', isCurrency = false }: any) => {
+    const diff = projected - current;
+    const isPositive = diff > 0;
+    const isNeutral = diff === 0;
+    
+    const colorClass = isNeutral 
+        ? 'text-slate-400' 
+        : (isPositive && !inverse) || (!isPositive && inverse) 
+            ? 'text-teal-600' 
+            : 'text-red-600';
+
+    const format = (val: number) => isCurrency ? `$${Math.round(val).toLocaleString()}` : Math.round(val);
+
+    return (
+        <div className="flex items-center justify-between p-3 hover:bg-slate-50 rounded-lg transition-colors">
+            <span className="text-slate-600 font-medium">{label}</span>
+            <div className="flex items-center gap-4">
+                <span className="text-slate-400 text-sm line-through decoration-slate-300">{format(current)}{suffix}</span>
+                <ArrowRight size={14} className="text-slate-300" />
+                <span className={`font-bold text-lg ${colorClass}`}>
+                    {format(projected)}{suffix}
+                </span>
+            </div>
+        </div>
+    )
+}
 
 const NavItem = ({ icon: Icon, label, active, onClick }: any) => (
   <button 
@@ -234,11 +361,12 @@ const NavItem = ({ icon: Icon, label, active, onClick }: any) => (
   </button>
 );
 
-const StatCard = ({ label, value, subValue, icon: Icon, color, bg }: any) => (
-  <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200 flex items-start justify-between hover:shadow-md transition-shadow">
+// Updated StatCard to handle isSimulated prop
+const StatCard = ({ label, value, subValue, icon: Icon, color, bg, isSimulated }: any) => (
+  <div className={`bg-white p-6 rounded-xl shadow-sm border transition-all duration-300 flex items-start justify-between hover:shadow-md ${isSimulated ? 'border-teal-200 ring-1 ring-teal-50 transform scale-[1.02]' : 'border-slate-200'}`}>
     <div>
       <p className="text-slate-500 text-sm font-medium mb-1">{label}</p>
-      <h4 className="text-2xl font-bold text-slate-900">{value}</h4>
+      <h4 className={`text-2xl font-bold ${isSimulated ? color : 'text-slate-900'} transition-colors`}>{value}</h4>
       {subValue && <p className="text-xs text-slate-400 mt-1">{subValue}</p>}
     </div>
     <div className={`p-3 rounded-lg ${bg} ${color}`}>
@@ -247,38 +375,37 @@ const StatCard = ({ label, value, subValue, icon: Icon, color, bg }: any) => (
   </div>
 );
 
-const HealthScoreGauge = ({ score }: { score: number }) => {
+const HealthScoreGauge = ({ score, isSimulated }: { score: number, isSimulated?: boolean }) => {
   const radius = 70;
   const stroke = 12;
   const normalizedScore = Math.min(100, Math.max(0, score));
-  // Arc calculations: semi-circle from 180 (left) to 0 (right)
   const arcLength = Math.PI * radius;
   const arcOffset = arcLength * ((100 - normalizedScore) / 100);
   
-  let color = "#22c55e"; // green-500
+  let color = "#22c55e"; 
   let label = "Excellent";
   let labelColor = "text-green-500";
   let bgLabel = "bg-green-100";
   
   if (score < 60) {
-    color = "#ef4444"; // red-500
+    color = "#ef4444"; 
     label = "Poor";
     labelColor = "text-red-600";
     bgLabel = "bg-red-100";
   } else if (score < 80) {
-    color = "#f59e0b"; // amber-500
+    color = "#f59e0b"; 
     label = "Fair";
     labelColor = "text-amber-600";
     bgLabel = "bg-amber-100";
   }
 
   return (
-    <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200 hover:shadow-md transition-shadow flex flex-col justify-between">
+    <div className={`bg-white p-6 rounded-xl shadow-sm border transition-all duration-300 flex flex-col justify-between hover:shadow-md ${isSimulated ? 'border-teal-200 ring-1 ring-teal-50 transform scale-[1.02]' : 'border-slate-200'}`}>
        <div className="w-full flex justify-between items-start mb-4">
          <div>
            <p className="text-slate-500 text-sm font-medium mb-1">Health Score</p>
            <div className="flex items-baseline gap-1">
-             <h4 className="text-3xl font-bold text-slate-900">{score}</h4>
+             <h4 className={`text-3xl font-bold ${isSimulated ? labelColor : 'text-slate-900'} transition-colors`}>{score}</h4>
              <span className="text-sm text-slate-400">/100</span>
            </div>
          </div>
@@ -289,7 +416,6 @@ const HealthScoreGauge = ({ score }: { score: number }) => {
       
       <div className="relative flex items-center justify-center pb-2">
          <svg width="160" height="85" viewBox="0 0 160 85" className="overflow-visible">
-            {/* Background Track */}
             <path 
                d="M 10,80 A 70,70 0 0 1 150,80"
                fill="none"
@@ -297,7 +423,6 @@ const HealthScoreGauge = ({ score }: { score: number }) => {
                strokeWidth={stroke}
                strokeLinecap="round"
             />
-            {/* Progress Track */}
             <path 
                d="M 10,80 A 70,70 0 0 1 150,80"
                fill="none"
@@ -308,7 +433,6 @@ const HealthScoreGauge = ({ score }: { score: number }) => {
                strokeDashoffset={arcOffset}
                className="transition-all duration-1000 ease-out"
             />
-            {/* Needle */}
             <circle cx="80" cy="80" r="4" fill="#94a3b8" />
             <g transform={`translate(80, 80) rotate(${(normalizedScore / 100) * 180 - 90})`} className="transition-transform duration-1000 ease-out">
                <path d="M -4,0 L 0,-65 L 4,0 Z" fill="#475569" />
